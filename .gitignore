@@ -1,0 +1,13 @@
+# Ignore everything
+*
+
+# But not these files
+!*.c
+!*.h
+!README*
+!Makefile
+!*.html
+!*.gif
+!*.ico
+!*.jpg
+!*.pdf
