@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include "arraylist.h"
 #define BUF_SIZE 1024
+
 static int num_threads;
 static pthread_mutex_t lock;
 static arraylist* messages;
@@ -36,6 +37,7 @@ int create_thread_variables() {
     pthread_mutex_unlock(&lock);
     return threadno;
 }
+
 void broadcast_message(char* message, int count, int threadno) {
     char* broadcast_string = malloc(sizeof(char) * 256);
     memcpy(broadcast_string, message, count);
@@ -50,6 +52,7 @@ void broadcast_message(char* message, int count, int threadno) {
     }
     pthread_mutex_unlock(&lock);
 }
+
 void read_messages(int sock, int threadno) {
     arraylist* my_messages = *(arraylist**)arraylist_get(messages, threadno);
     pthread_mutex_lock(&lock);
@@ -64,11 +67,30 @@ void read_messages(int sock, int threadno) {
 }
     
 void* user_thread(void* sockptr) {
-    int threadno = create_thread_variables();
     int sock = *(int*) sockptr;
     free(sockptr);
+    write(sock, "What is your name?\n", 19);
     char buf[255];
+    char name_buf[255];
     int recv_count;
+    while((recv_count = recv(sock, name_buf, 255, 0)) < 0) {
+        wait(sock, 30000);
+    }
+    int threadno = create_thread_variables();
+    char name_msg[512];
+    int name_len = recv_count - 2;
+    if (recv_count == 0) {
+        write(sock, "No name provided\n", 17);
+        arraylist* my_messages = *(arraylist**)arraylist_get(messages, threadno);
+        arraylist_free(my_messages);
+        return NULL;
+    }    
+    memcpy(name_msg, name_buf, recv_count - 1);
+    strcpy(name_msg + name_len, " has entered the room\n");
+    broadcast_message(name_msg, recv_count + 22, threadno);
+    name_msg[name_len] = ':';
+    name_msg[name_len + 1] = ' ';
+    name_len += 2;
     int done = 0;
     while (!done) {
         wait(sock, 300);
@@ -77,14 +99,14 @@ void* user_thread(void* sockptr) {
             done = 1;
         }
         else {
-
             if(recv_count<0) {
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
                     perror("Receive failed");
                 }
             }
             else {
-                broadcast_message(buf, recv_count, threadno);
+                strncpy(name_msg + name_len, buf, recv_count);
+                broadcast_message(name_msg, recv_count + name_len, threadno);
             }
             read_messages(sock, threadno); 
         }
