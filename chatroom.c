@@ -12,11 +12,16 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include "arraylist.h"
+#include "linkedlist.h"
 #define BUF_SIZE 1024
+
+void broadcast_message(char* message, int count, int threadno);
 
 static int num_threads;
 static pthread_mutex_t lock;
 static arraylist* messages;
+static arraylist* names;
+static linkedlist* openspaces;
 
 void wait(int fd, int num_millisecs) {
     struct timeval tv;
@@ -28,14 +33,45 @@ void wait(int fd, int num_millisecs) {
     select(fd + 1, &set, NULL, NULL, &tv);
 }
 
-int create_thread_variables() {
+int create_thread_variables(char* name) {
     pthread_mutex_lock(&lock);
-    int threadno = num_threads;
-    num_threads++;
+    int threadno;
     arraylist* thread_messages = arraylist_init(sizeof(char*), 1);
-    arraylist_addEnd(messages, &thread_messages);
+    char* name_buf = malloc(BUF_SIZE);
+    if (linkedlist_size(openspaces)) {
+        threadno = *(int*)linkedlist_rmend(openspaces);
+        arraylist_set(messages, threadno, &thread_messages); 
+        arraylist_set(names, threadno, &name_buf);
+    }
+    else {
+        threadno = num_threads;
+        arraylist_addEnd(messages, &thread_messages);
+        arraylist_addEnd(names, &name_buf);
+    }
+    num_threads++;
     pthread_mutex_unlock(&lock);
     return threadno;
+}
+
+void delete_thread_variables(int threadno) {
+    pthread_mutex_lock(&lock);
+    num_threads--;
+    arraylist* my_messages = *(arraylist**)arraylist_get(messages, threadno);
+    arraylist_free(my_messages);
+    void* null = NULL;
+    arraylist_set(messages, threadno, &null);
+    linkedlist_addfront(openspaces, &threadno); 
+    pthread_mutex_unlock(&lock);
+}
+
+void graceful_exit(int threadno, char* name) {
+    char buf[512];
+    int len = strlen(name) - 2;
+    memcpy(buf, name, len);
+    buf[len] = 0;
+    strcat(buf, " has exited\n");
+    broadcast_message(buf, strlen(buf), threadno);
+    delete_thread_variables(threadno);
 }
 
 void broadcast_message(char* message, int count, int threadno) {
@@ -48,7 +84,9 @@ void broadcast_message(char* message, int count, int threadno) {
             continue;
         }
         arraylist* thread_messages = *(arraylist**)arraylist_get(messages, i);
-        arraylist_addEnd(thread_messages, &broadcast_string);
+        if (thread_messages) {
+            arraylist_addEnd(thread_messages, &broadcast_string);
+        }
     }
     pthread_mutex_unlock(&lock);
 }
@@ -65,7 +103,7 @@ void read_messages(int sock, int threadno) {
     arraylist_clear(my_messages);
     pthread_mutex_unlock(&lock);
 }
-    
+
 void* user_thread(void* sockptr) {
     int sock = *(int*) sockptr;
     free(sockptr);
@@ -76,15 +114,14 @@ void* user_thread(void* sockptr) {
     while((recv_count = recv(sock, name_buf, 255, 0)) < 0) {
         wait(sock, 30000);
     }
-    int threadno = create_thread_variables();
+    int threadno = create_thread_variables(name_buf);
     char name_msg[512];
     int name_len = recv_count - 2;
     if (recv_count == 0) {
         write(sock, "No name provided\n", 17);
-        arraylist* my_messages = *(arraylist**)arraylist_get(messages, threadno);
-        arraylist_free(my_messages);
+        graceful_exit(threadno, name_buf);
         return NULL;
-    }    
+    }
     memcpy(name_msg, name_buf, recv_count - 1);
     strcpy(name_msg + name_len, " has entered the room\n");
     broadcast_message(name_msg, recv_count + 22, threadno);
@@ -108,11 +145,10 @@ void* user_thread(void* sockptr) {
                 strncpy(name_msg + name_len, buf, recv_count);
                 broadcast_message(name_msg, recv_count + name_len, threadno);
             }
-            read_messages(sock, threadno); 
+            read_messages(sock, threadno);
         }
     }
-    arraylist* my_messages = *(arraylist**)arraylist_get(messages, threadno);
-    arraylist_free(my_messages);
+    graceful_exit(threadno, name_buf);
     return NULL;
 }
 int main(int argc, char** argv) {
@@ -163,6 +199,8 @@ int main(int argc, char** argv) {
     pthread_mutex_init(&lock, NULL);
     num_threads = 0;
     messages = arraylist_init(sizeof(arraylist*), 8);
+    names = arraylist_init(sizeof(char*), 8);
+    openspaces = linkedlist_init(sizeof(int));
     pthread_t thread;
     while (1) {
         int* sockptr = (int*)malloc(sizeof(int));
