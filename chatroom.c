@@ -40,7 +40,7 @@ int create_thread_variables(char* name) {
     char* name_buf = malloc(BUF_SIZE);
     if (linkedlist_size(openspaces)) {
         threadno = *(int*)linkedlist_rmend(openspaces);
-        arraylist_set(messages, threadno, &thread_messages); 
+        arraylist_set(messages, threadno, &thread_messages);
         arraylist_set(names, threadno, &name_buf);
     }
     else {
@@ -60,7 +60,7 @@ void delete_thread_variables(int threadno) {
     arraylist_free(my_messages);
     void* null = NULL;
     arraylist_set(messages, threadno, &null);
-    linkedlist_addfront(openspaces, &threadno); 
+    linkedlist_addfront(openspaces, &threadno);
     pthread_mutex_unlock(&lock);
 }
 

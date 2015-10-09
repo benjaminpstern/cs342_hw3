@@ -9,12 +9,12 @@
 * void arraylist_addEnd(arraylist *list, void* item)
 	adds item to the end by creating a copy. Constant time.
 * void arraylist_add(arraylist *list, int index, void* item)
-	inserts item into index by copying the element. Insertion to the front is O(size of list) 
+	inserts item into index by copying the element. Insertion to the front is O(size of list)
 	so with big lists you should avoid doing that too much.
 * void* arraylist_set(arraylist *list, int index, void* item)
 	sets the space at index to be item by copying.  Returns the item that was previously in that space,
 	with allocated memory from malloc.  You should always free the return value when you're done with it.
-	if you just want to set and don't care about the element that was previously there, say 
+	if you just want to set and don't care about the element that was previously there, say
 	free(arraylist_set(list, index, item));
 * void* arraylist_get(arraylist *list, int index)
 	gets the item at space index.
@@ -30,13 +30,13 @@
 	returns 1 if the arraylist is empty(size is 0) otherwise returns 0
 * arraylist* arraylist_subList(arraylist *list, int startIndex, int endIndex)
 	returns a sublist by copying the data.  If you create a sublist and change it,
-	it won't affect the original list. As the sublist is another arraylist, you should free it 
+	it won't affect the original list. As the sublist is another arraylist, you should free it
 	when you're done with it with arraylist_free
 * void arraylist_clear(arraylist *list)
 	clears all the elements in the arraylist.
 * void arraylist_free(arraylist *list)
 	frees the array allocated by malloc and also frees the memory taken up by the structure.
-	if you free an arraylist you won't be able to use it again, you'll have to initialize a new one with 
+	if you free an arraylist you won't be able to use it again, you'll have to initialize a new one with
 	arraylist_init
 * void arraylist_swap(arraylist *list, int index1, int index2)
 	swaps 2 elements in the arraylist.  If I have an arraylist that is [3,6,9] and I swap elements 0 and 2 then I have
@@ -76,7 +76,7 @@ void arraylist_addEnd(arraylist *list, void* itemPtr){
  * Adding to the beginning takes linear time
  */
 void arraylist_add(arraylist *list,int index, void* itemPtr){
-	if(index>list->size||index<0) 
+	if(index>list->size||index<0)
 		fprintf(stderr,"your index is out of bounds. size:%d index %d\n",list->size,index);
 	int elem_size=list->element_size;
 	if(list->size==list->capacity){
@@ -101,7 +101,7 @@ void* arraylist_removeEnd(arraylist *list){
  * removing from the end takes constant time.
  */
 void* arraylist_remove(arraylist *list, int index){
-	if(index>list->size||index<0) 
+	if(index>list->size||index<0)
 		fprintf(stderr,"your index is out of bounds. size:%d index %d\n",list->size,index);
 	void *position=list->array+index*list->element_size;
 	void *element;
@@ -116,7 +116,7 @@ void* arraylist_remove(arraylist *list, int index){
  * This item is the item in the arraylist, not a copy.
  */
 void* arraylist_get(arraylist *list, int index){
-	if(index>=list->size||index<0) 
+	if(index>=list->size||index<0)
 		fprintf(stderr,"your index is out of bounds. size:%d index %d\n",list->size,index);
 	return list->array+index*list->element_size;
 }
@@ -126,7 +126,7 @@ void* arraylist_get(arraylist *list, int index){
  * this item should be freed at some point
  */
 void* arraylist_set(arraylist *list, int index, void* itemPtr){
-	if(index>=list->size||index<0) 
+	if(index>=list->size||index<0)
 		fprintf(stderr,"your index is out of bounds. size:%d index %d\n",list->size,index);
 	void *object;
 	void *position=list->array+index*list->element_size;
@@ -170,7 +170,7 @@ void arraylist_clear(arraylist *list){
  */
 arraylist* arraylist_subList(arraylist *list, int startIndex, int endIndex){
 	int i;
-	if(startIndex>=list->size||startIndex<0||endIndex>=list->size||endIndex<0||endIndex<startIndex) 
+	if(startIndex>=list->size||startIndex<0||endIndex>=list->size||endIndex<0||endIndex<startIndex)
 		fprintf(stderr,"your index is out of bounds. size:%d startIndex %d endIndex %d\n",list->size,startIndex,endIndex);
 	int newSize=endIndex-startIndex+1;
 	arraylist *sublist=arraylist_init(list->element_size,newSize);
