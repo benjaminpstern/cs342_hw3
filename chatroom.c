@@ -38,6 +38,7 @@ int create_thread_variables(char* name) {
     int threadno;
     arraylist* thread_messages = arraylist_init(sizeof(char*), 1);
     char* name_buf = malloc(BUF_SIZE);
+    strcpy(name_buf, name);
     if (linkedlist_size(openspaces)) {
         threadno = *(int*)linkedlist_rmend(openspaces);
         arraylist_set(messages, threadno, &thread_messages);
@@ -58,9 +59,18 @@ void delete_thread_variables(int threadno) {
     num_threads--;
     arraylist* my_messages = *(arraylist**)arraylist_get(messages, threadno);
     arraylist_free(my_messages);
-    void* null = NULL;
-    arraylist_set(messages, threadno, &null);
-    linkedlist_addfront(openspaces, &threadno);
+    char* my_name = *(char**)arraylist_get(names, threadno);
+    free(my_name);
+    if (threadno < arraylist_size(messages) - 1) {
+        void* null = NULL;
+        arraylist_set(messages, threadno, &null);
+        arraylist_set(names, threadno, &null);
+        linkedlist_addfront(openspaces, &threadno);
+    }
+    else {
+        arraylist_removeEnd(messages);
+        arraylist_removeEnd(names);
+    }
     pthread_mutex_unlock(&lock);
 }
 
@@ -74,6 +84,36 @@ void graceful_exit(int threadno, char* name) {
     delete_thread_variables(threadno);
 }
 
+/*
+ * Must be called before giving this user a name
+ */
+void read_names(int sock) {
+    pthread_mutex_lock(&lock);
+    char* buf = malloc((arraylist_size(names) + 1) * BUF_SIZE);
+    int userCount = 0;
+    strcpy(buf, "Users in the room: ");
+    for (int i = 0; i < arraylist_size(names); i++) {
+        char* name = *(char**)arraylist_get(names, i);
+        if (name != NULL) {
+            userCount++;
+            int buflen = strlen(buf);
+            int namelen = strlen(name);
+            strncat(buf, name, namelen - 2);
+            strcat(buf, ", ");
+        }
+    }
+    pthread_mutex_unlock(&lock);
+    if (!userCount) {
+        strcpy(buf, "You are the first in this room\n");
+    }
+    else {
+        int len = strlen(buf);
+        buf[len - 2] = '\n'; // remove the comma at the end
+        buf[len - 1] = 0; // null termination
+    }
+    write(sock, buf, strlen(buf));
+    free(buf);
+}
 void broadcast_message(char* message, int count, int threadno) {
     char* broadcast_string = malloc(sizeof(char) * 256);
     memcpy(broadcast_string, message, count);
@@ -114,14 +154,14 @@ void* user_thread(void* sockptr) {
     while((recv_count = recv(sock, name_buf, 255, 0)) < 0) {
         wait(sock, 30000);
     }
+    if (recv_count == 0) {
+        write(sock, "No name provided\n", 17);
+        return NULL;
+    }
+    read_names(sock);
     int threadno = create_thread_variables(name_buf);
     char name_msg[512];
     int name_len = recv_count - 2;
-    if (recv_count == 0) {
-        write(sock, "No name provided\n", 17);
-        graceful_exit(threadno, name_buf);
-        return NULL;
-    }
     memcpy(name_msg, name_buf, recv_count - 1);
     strcpy(name_msg + name_len, " has entered the room\n");
     broadcast_message(name_msg, recv_count + 22, threadno);
