@@ -96,7 +96,6 @@ void read_names(int sock) {
         char* name = *(char**)arraylist_get(names, i);
         if (name != NULL) {
             userCount++;
-            int buflen = strlen(buf);
             int namelen = strlen(name);
             strncat(buf, name, namelen - 2);
             strcat(buf, ", ");
@@ -191,6 +190,7 @@ void* user_thread(void* sockptr) {
     graceful_exit(threadno, name_buf);
     return NULL;
 }
+
 int main(int argc, char** argv) {
     int port;
     if (argc < 2) {
